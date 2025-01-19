@@ -1,49 +1,93 @@
+\COPY university_professors(firstname, lastname, university, university_shortname, university_city, function, organization, organization_sector)
+FROM '/var/lib/postgresql/university_professors.csv' DELIMITER ',' CSV HEADER;
 
-CREATE DATABASE LibraryManagementSystem;
-
-\c librarymanagementsystem;
-
-CREATE TABLE Books (
-    book_id SERIAL PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    author VARCHAR(255) NOT NULL,
-    publisher VARCHAR(255) NOT NULL,
-    availability BOOLEAN DEFAULT TRUE
+CREATE TABLE university_professors (
+    firstname VARCHAR(128) NOT NULL,
+    lastname VARCHAR(128) NOT NULL,
+    university VARCHAR(255) NOT NULL,
+    university_shortname VARCHAR(50) NOT NULL,
+    university_city VARCHAR(255) NOT NULL,
+    function VARCHAR(255) NOT NULL,
+    organization VARCHAR(255) NOT NULL,
+    organization_sector VARCHAR(100) NOT NULL
 );
 
-CREATE TABLE Users (
-    user_id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL
+SELECT * FROM university_professors;
+
+CREATE TABLE universities (
+    id SERIAL PRIMARY KEY,
+    university VARCHAR(255) NOT NULL,
+    university_shortname VARCHAR(50) NOT NULL,
+    university_city VARCHAR(100) NOT NULL,
+    UNIQUE (university, university_shortname, university_city)
 );
 
-CREATE TABLE Transactions (
-    transaction_id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES Users(user_id) ON DELETE CASCADE,
-    book_id INT REFERENCES Books(book_id) ON DELETE CASCADE,
-    transaction_type VARCHAR(20) NOT NULL,
-    transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE organizations (
+    id SERIAL PRIMARY KEY,
+    organization VARCHAR(255) NOT NULL,
+    organization_sector VARCHAR(100) NOT NULL,
+    UNIQUE (organization, organization_sector)
 );
 
-INSERT INTO Books (title, author, publisher) VALUES
-('Shah Jo Risalo', 'Shah Abdul Latif Bhittai', 'Sindhi Literature'),
-('Diwan-e-Ghalib', 'Mirza Ghalib', 'Urdu Poetry Classics'),
-('Bang-e-Dra', 'Allama Iqbal', 'Iqbal Academy'),
-('Saif-ul-Maluk', 'Mian Muhammad Bakhsh', 'Punjabi Literature');
+CREATE TABLE professors (
+    id SERIAL PRIMARY KEY,
+    firstname VARCHAR(128) NOT NULL,
+    lastname VARCHAR(128) NOT NULL,
+    university_id INT NOT NULL REFERENCES universities(id) ON DELETE CASCADE,
+    UNIQUE (firstname, lastname, university_id)
+);
+CREATE TABLE affiliations (
+    id SERIAL PRIMARY KEY,
+    professor_id INT NOT NULL REFERENCES professors(id) ON DELETE CASCADE,
+    function VARCHAR(255) NOT NULL,
+    organization_id INT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    UNIQUE (professor_id, function, organization_id)
+);
 
-INSERT INTO Users (name, email) VALUES
-('Ali Raza', 'ali.raza@example.com'),
-('Fatima Noor', 'fatima.noor@example.com'),
-('Hamza Khan', 'hamza.khan@example.com'),
-('Ayesha Tariq', 'ayesha.tariq@example.com');
+INSERT INTO universities (university, university_shortname, university_city)
+SELECT DISTINCT university, university_shortname, university_city
+FROM university_professors;
 
-INSERT INTO Transactions (user_id, book_id, transaction_type) VALUES
-(1, 1, 'borrow'),
-(2, 2, 'borrow'),
-(3, 3, 'borrow');
+SELECT * FROM universities;
 
-UPDATE Books SET availability = FALSE WHERE book_id = 1;
+INSERT INTO organizations (organization, organization_sector)
+SELECT DISTINCT organization, organization_sector
+FROM university_professors;
 
-DELETE FROM Transactions WHERE transaction_id = 1;
+SELECT * FROM organizations;
 
-DELETE FROM Books WHERE book_id = 3;
+INSERT INTO professors (firstname, lastname, university_id)
+SELECT DISTINCT u.firstname, u.lastname, un.id
+FROM university_professors u
+JOIN universities un ON u.university = un.university;
+
+SELECT * FROM professors;
+
+INSERT INTO affiliations (professor_id, function, organization_id)
+SELECT DISTINCT p.id, u.function, o.id
+FROM university_professors u
+JOIN professors p ON u.firstname = p.firstname AND u.lastname = p.lastname
+JOIN organizations o ON u.organization = o.organization;
+
+SELECT * FROM affiliations;
+
+-- Trying to insert duplicate data
+INSERT INTO universities (university, university_shortname, university_city)
+VALUES ('Example University', 'EXU', 'Example City');
+
+-- Update university name safely
+UPDATE universities
+SET university = 'Updated University Name'
+WHERE id = 1;
+
+SELECT p.firstname, p.lastname, un.university, a.function, o.organization
+FROM professors p
+JOIN universities un ON p.university_id = un.id
+JOIN affiliations a ON p.id = a.professor_id
+JOIN organizations o ON a.organization_id = o.id;
+
+SELECT p.firstname, p.lastname, o.organization
+FROM professors p
+JOIN affiliations a ON p.id = a.professor_id
+JOIN organizations o ON a.organization_id = o.id
+WHERE o.organization = 'Amazentis';
