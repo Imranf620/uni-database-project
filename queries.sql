@@ -12,6 +12,8 @@ CREATE TABLE university_professors (
     organization_sector VARCHAR(100) NOT NULL
 );
 
+//
+
 SELECT * FROM university_professors;
 
 CREATE TABLE universities (
